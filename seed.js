@@ -1,0 +1,4 @@
+import { randomUUID } from 'node:crypto';
+const uid = () => randomUUID().slice(0, 8);
+const M = (c, l) => l.map(([n, p]) => ({ id: uid(), cat: c, name: n, price: p }));
+export const seedProds = () => ({ prods:[...M('Platos principales',[['Mofongo de camarones',500],['Pechuga a la plancha',400],['Lambí con tostones',500],['Hamburguesa más papas',300],['Yaroa de pollo · Grande',400],['Yaroa de pollo · Pequeña',200],['Yaroa mixta · Grande',450],['Yaroa mixta · Pequeña',250],['Yaroa de res · Grande',450],['Yaroa de res · Pequeña',250],['Alitas locas',300],['Tacos · 1 por',80],['Tacos · 3 por',225],['Pescado + guarnición y ensalada',650],['Pechuga a la crema + fritos',400],['Quesadilla',200],['Burrito',350]]),...M('Extras',[['Sándwich jamón, queso y huevo',125],['Club Sándwich + tuna y pollo',250],['Sándwich de atún y pollo',250]]),...M('Bebidas',[['Jugo (limón / chinola)',75],['Refresco',40]])] }).prods;

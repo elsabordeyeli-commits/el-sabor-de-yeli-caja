@@ -1,6 +1,6 @@
 <!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>El sabor de Yeli · Caja</title>
+<link rel="manifest" href="data:application/json,%7B%22name%22%3A%22El%20sabor%20de%20Yeli%22%2C%22short_name%22%3A%22Yeli%22%2C%22start_url%22%3A%22%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23fff7f1%22%2C%22theme_color%22%3A%22%23f2541b%22%7D"><meta name="theme-color" content="#f2541b"><title>El sabor de Yeli · Caja</title>
 <style>
 :root{--bg:#fff7f1;--card:#fff;--tx:#231a15;--mu:#7a6a60;--or:#f2541b;--bd:#f3d9c8;--bad:#c0392b;--ok:#2e7d32;--btn:#f2541b;--btx:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17110e;--card:#241a15;--tx:#fbefe6;--mu:#b39d8f;--bd:#4a3226;--bad:#ff7b6b;--ok:#6fcf74}}
@@ -36,9 +36,21 @@ const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>
 const money=n=>'RD$ '+Number(n||0).toLocaleString('es-DO',{maximumFractionDigits:2}),uid=()=>Math.random().toString(36).slice(2,9),sum=a=>a.reduce((t,x)=>t+x,0);
 const hm=t=>new Date(t).toLocaleString('es-DO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}),d0=()=>new Date().setHours(0,0,0,0);
 const M=(c,l)=>l.map(([n,p])=>({id:uid(),cat:c,name:n,price:p}));
-const DEF={users:[{id:'u1',name:'Presidente',user:'presidente',pass:'dueno123',role:'o'},{id:'u2',name:'Administrador',user:'admin',pass:'admin123',role:'a'},{id:'u3',name:'Vendedor',user:'vendedor',pass:'vende123',role:'s'}],prods:[...M('Platos principales',[['Mofongo de camarones',500],['Pechuga a la plancha',400],['Lambí con tostones',500],['Hamburguesa más papas',300],['Yaroa de pollo · Grande',400],['Yaroa de pollo · Pequeña',200],['Yaroa mixta · Grande',450],['Yaroa mixta · Pequeña',250],['Yaroa de res · Grande',450],['Yaroa de res · Pequeña',250],['Alitas locas',300],['Tacos · 1 por',80],['Tacos · 3 por',225],['Pescado + guarnición y ensalada',650],['Pechuga a la crema + fritos',400],['Quesadilla',200],['Burrito',350]]),...M('Extras',[['Sándwich jamón, queso y huevo',125],['Club Sándwich + tuna y pollo',250],['Sándwich de atún y pollo',250]]),...M('Bebidas',[['Jugo (limón / chinola)',75],['Refresco',40]])],cash:{open:false},tabs:[],hist:[],sales:[],exps:[],credits:[],buys:[],movs:[],use:{},cfg:null};
-let S;try{S=JSON.parse(localStorage.getItem('yeli2'))||DEF}catch(e){S=DEF}
-const save=()=>{try{localStorage.setItem('yeli2',JSON.stringify(S))}catch(e){}};
+const BLK='⛔ Usuario bloqueado. Comuníquese con su servidor para renovar el pago.';
+const AR=['users','prods','tabs','hist','sales','exps','credits','buys','movs'],OB=['cash','use','cfg'];
+const empty=()=>({users:[],prods:[],cash:{open:false},tabs:[],hist:[],sales:[],exps:[],credits:[],buys:[],movs:[],use:{},cfg:null});
+let S=empty(),TK=null,snap={},pushing=false,again=false,last='';
+try{TK=localStorage.getItem('yeli_tk')}catch(e){}
+const api=(p,b)=>fetch(p,{method:b?'POST':'GET',headers:{'content-type':'application/json',authorization:'Bearer '+TK},body:b?JSON.stringify(b):undefined});
+function mkSnap(){snap={};AR.forEach(k=>{snap[k]={};S[k].forEach(i=>snap[k][i.id]=JSON.stringify(i))});OB.forEach(k=>snap[k]=JSON.stringify(S[k]))}
+function logout(m){me=null;TK=null;err=m||'';try{localStorage.removeItem('yeli_tk')}catch(e){}S=empty();last='';render()}
+async function pull(force){if(!TK||pushing)return;try{const r=await api('/api/state');if(r.status===403)return logout(BLK);if(r.status===401)return logout();const j=await r.json(),t=JSON.stringify(j);if(!force&&t===last)return;if(!force&&(dlg||/INPUT|SELECT/.test(document.activeElement?.tagName||'')))return;last=t;me=j.me;S=Object.assign(empty(),j.state);mkSnap();render()}catch(e){}}
+async function push(){if(pushing){again=true;return}pushing=true;let fail=false;try{do{again=false;const set={},upsert={},del={};let n=0;
+ AR.forEach(k=>{const cur={};S[k].forEach(i=>cur[i.id]=1);const up=S[k].filter(i=>snap[k][i.id]!==JSON.stringify(i)),dl=Object.keys(snap[k]).filter(id=>!cur[id]);if(up.length){upsert[k]=up;n++}if(dl.length){del[k]=dl;n++}});
+ OB.forEach(k=>{if(JSON.stringify(S[k])!==snap[k]){set[k]=S[k];n++}});if(!n)break;
+ const r=await api('/api/state',{set,upsert,del});if(r.status===403&&(await r.clone().json().catch(()=>({}))).error==='blocked'){pushing=false;return logout(BLK)}if(!r.ok){fail=true;break}mkSnap()}while(again)}catch(e){fail=true}
+ pushing=false;if(fail)dlg={title:'Aviso',fields:[],msg:'No se pudo guardar. Revisa tu conexión o tus permisos.'};pull(true)}
+const save=()=>{push()};
 const RN={o:'Presidente',a:'Administrador',s:'Vendedor'};
 let me=null,tab='venta',cat='Todas',cart=[],curTab=null,mesa='',rcpt=null,rep=null,dlg=null,err='',tx={i:0,p:0},per=1,gm=0;
 const cats=()=>[...new Set(S.prods.map(p=>p.cat))];
@@ -46,8 +58,8 @@ function ask(title,fields,ok,msg){dlg={title,fields:fields||[],ok,msg};render()}
 const alertM=m=>ask('Aviso',[],null,m);
 function dlgOk(){const v=dlg.fields.map((f,i)=>$('#df'+i).value),f=dlg.ok;dlg=null;const e=f?f(v):0;if(e)dlg={title:'Aviso',fields:[],msg:e};save();render()}
 const dlgHTML=()=>dlg?`<div class="mo np"><div class="card"><b>${esc(dlg.title)}</b>${dlg.msg?`<p>${esc(dlg.msg)}</p>`:''}${dlg.fields.map((f,i)=>`<p class="mu" style="margin:8px 0 2px">${esc(f.l)}</p>${f.o?`<select id="df${i}">${f.o.map(o=>`<option value="${o[0]}">${esc(o[1])}</option>`).join('')}</select>`:`<input id="df${i}" type="${f.t||'text'}" value="${esc(f.v??'')}">`}`).join('')}<div class="row" style="margin-top:12px">${dlg.ok?'<button class="g" onclick="dlg=null;render()">Cancelar</button>':''}<button onclick="${dlg.ok?'dlgOk()':'dlg=null;render()'}">Aceptar</button></div></div></div>`:'';
-function login(){const u=S.users.find(x=>x.user===$('#lu').value.trim().toLowerCase()&&x.pass===$('#lp').value);
- if(!u)err='Usuario o contraseña incorrectos';else if(u.blocked)err='⛔ Usuario bloqueado. Comuníquese con su servidor para renovar el pago.';else{me=u;err='';tab='venta'}render()}
+async function login(){try{const r=await fetch('/api/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({user:$('#lu').value.trim().toLowerCase(),pass:$('#lp').value})}),j=await r.json().catch(()=>({}));
+ if(!r.ok){err=j.error==='blocked'?BLK:'Usuario o contraseña incorrectos';return render()}TK=j.token;try{localStorage.setItem('yeli_tk',TK)}catch(e){}err='';tab='venta';await pull(true)}catch(e){err='Sin conexión con el servidor';render()}}
 const go=t=>{tab=t;rcpt=rep=null;render()};
 /* ---- venta ---- */
 const sub=()=>sum(cart.map(i=>i.price*i.qty)),itb=()=>tx.i?Math.round(sub()*18)/100:0,prp=()=>tx.p?Math.round(sub()*10)/100:0,total=()=>sub()+itb()+prp();
@@ -111,7 +123,7 @@ function vFondo(){if(!S.cfg)return`<div class="card"><b>Fondo del negocio</b><p 
 const canM=u=>me.role==='o'?u.role!=='o':me.role==='a'&&u.role==='s';
 function addUser(){const n=$('#un').value.trim(),u=$('#uu').value.trim().toLowerCase(),p=$('#up').value,r=me.role==='o'?$('#ur').value:'s';if(!n||!u||p.length<4)return alertM('Completa nombre, usuario y contraseña (mínimo 4 caracteres).');if(S.users.some(x=>x.user===u))return alertM('Ese usuario ya existe.');S.users.push({id:uid(),name:n,user:u,pass:p,role:r});save();render()}
 const editU=id=>{const u=S.users.find(x=>x.id===id);ask('Editar '+u.name,[{l:'Nombre',v:u.name},{l:'Nueva contraseña (vacío = no cambiar)',t:'password'}],v=>{if(v[0].trim())u.name=v[0].trim();if(v[1]){if(v[1].length<4)return'Mínimo 4 caracteres';u.pass=v[1]}})};
-const myPass=()=>ask('Cambiar mi contraseña',[{l:'Nueva contraseña',t:'password'}],v=>{if(v[0].length<4)return'Mínimo 4 caracteres';me.pass=v[0]});
+const myPass=()=>ask('Cambiar mi contraseña',[{l:'Nueva contraseña',t:'password'}],v=>{if(v[0].length<4)return'Mínimo 4 caracteres';api('/api/state',{upsert:{users:[{id:me.id,pass:v[0]}]}})});
 const delU=id=>ask('Eliminar usuario',[],()=>{S.users=S.users.filter(x=>x.id!==id)},'¿Seguro que quieres eliminarlo?');
 const blk=id=>{const u=S.users.find(x=>x.id===id);u.blocked=!u.blocked;save();render()};
 const resetData=()=>ask('Borrar datos de prueba',[{l:'Escribe BORRAR para confirmar'}],v=>{if(v[0].trim().toUpperCase()!=='BORRAR')return'No se borró nada.';Object.assign(S,{cash:{open:false},tabs:[],hist:[],sales:[],exps:[],credits:[],buys:[],movs:[],use:{},cfg:null})});
@@ -123,10 +135,11 @@ const vMenu=()=>`<div class="card"><b>Agregar plato</b><div class="row" style="m
 /* ---- shell ---- */
 const TABS=[['venta','Venta','oas',vVenta],['cuentas','Cuentas','oas',vCuentas],['caja','Caja','oas',vCaja],['cred','Créditos','oas',vCred],['compras','Compras','oa',vCompras],['inv','Inventario','oa',vInv],['resumen','Resumen','oa',vResumen],['gan','Ganancias','oa',vGan],['fondo','Fondo','oa',vFondo],['hist','Reportes','oa',vHist],['menu','Menú','oa',vMenu],['users','Usuarios','oa',vUsers]];
 function render(){const a=$('#app');
- if(me&&(!S.users.find(u=>u.id===me.id)||S.users.find(u=>u.id===me.id).blocked)){me=null;err='⛔ Usuario bloqueado. Comuníquese con su servidor para renovar el pago.'}
- if(!me){a.innerHTML=`<div class="login"><div><h1>El sabor de Yeli</h1><p class="mu" style="text-align:center;margin:0 0 10px">Control de caja</p><input id="lu" placeholder="Usuario" autocapitalize="none" style="margin-bottom:8px"><input id="lp" type="password" placeholder="Contraseña" onkeydown="if(event.key==='Enter')login()"><p style="color:#c0392b;margin:6px 0;font-weight:600">${err}</p><button style="width:100%" onclick="login()">Entrar</button></div></div>${dlgHTML()}`;return}
+  if(!me){a.innerHTML=`<div class="login"><div><h1>El sabor de Yeli</h1><p class="mu" style="text-align:center;margin:0 0 10px">Control de caja</p><input id="lu" placeholder="Usuario" autocapitalize="none" style="margin-bottom:8px"><input id="lp" type="password" placeholder="Contraseña" onkeydown="if(event.key==='Enter')login()"><p style="color:#c0392b;margin:6px 0;font-weight:600">${err}</p><button style="width:100%" onclick="login()">Entrar</button></div></div>${dlgHTML()}`;return}
  const T=TABS.filter(t=>t[2].includes(me.role));if(!T.find(t=>t[0]===tab))tab='venta';
  const v=rcpt?`<b class="np" style="color:var(--ok)">✓ Venta registrada</b>${receipt(rcpt)}<div class="row np"><button class="g" onclick="print()">Imprimir</button><button onclick="rcpt=null;render()">Nueva venta</button></div>`:T.find(t=>t[0]===tab)[3]();
- a.innerHTML=`<header class="np"><b>El sabor de Yeli</b><span class="mu">${esc(me.name)} · ${S.cash.open?'Caja abierta':'Caja cerrada'}</span><button class="g" onclick="me=null;err='';render()">Salir</button></header><nav class="np">${T.map(t=>`<button class="${tab===t[0]?'':'g'}" onclick="go('${t[0]}')">${t[1]}${t[0]==='cuentas'&&S.tabs.length?' ('+S.tabs.length+')':''}</button>`).join('')}</nav><main>${v}</main>${dlgHTML()}`}
-render();
+ a.innerHTML=`<header class="np"><b>El sabor de Yeli</b><span class="mu">${esc(me.name)} · ${S.cash.open?'Caja abierta':'Caja cerrada'}</span><button class="g" onclick="logout()">Salir</button></header><nav class="np">${T.map(t=>`<button class="${tab===t[0]?'':'g'}" onclick="go('${t[0]}')">${t[1]}${t[0]==='cuentas'&&S.tabs.length?' ('+S.tabs.length+')':''}</button>`).join('')}</nav><main>${v}</main>${dlgHTML()}`}
+setInterval(()=>pull(),5000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)pull()});
+if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
+TK?pull(true).then(()=>{if(!me)render()}):render();
 </script></body></html>
